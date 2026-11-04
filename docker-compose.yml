@@ -1,0 +1,40 @@
+services:
+  dns:
+    # Constroi a imagem a partir de infra/dns (Dockerfile + dnsmasq.conf)
+    build:
+      context: ./infra/dns
+    container_name: agnello-dns
+ 
+    # O DHCP do dnsmasq precisa de permissao extra de rede.
+    # Sem isso ele reclama de permissao ao subir.
+    cap_add:
+      - NET_ADMIN
+ 
+    # Entra na rede abaixo com IP fixo (o mesmo do contrato e do .conf)
+    networks:
+      agnello-net:
+        ipv4_address: 172.28.0.2
+ 
+    # Sobe de novo sozinho se cair, exceto se voce o parar de proposito
+    restart: unless-stopped
+ 
+    # ATENCAO: nao ha "ports:" de proposito. O DNS so precisa ser
+    # acessivel DENTRO da rede Docker. Publicar a porta 53 no PC costuma
+    # conflitar com servicos do Windows e expoe o DNS sem necessidade.
+ 
+ 
+# =====================================================================
+# REDE
+# =====================================================================
+networks:
+  agnello-net:
+    # Nome fixo da rede (sem prefixo da pasta do projeto). Facilita os
+    # comandos de teste: docker network inspect agnello-net
+    name: agnello-net
+    driver: bridge
+    # IPAM = gerenciamento de enderecos. E ele que permite IP fixo.
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
+
