@@ -1,0 +1,10 @@
+infra/tls/
+*.key
+*.pem
+*.crt
+/out/
+/deploy/releases/
+.env*
+!.env.example
+.DS_Store
+Thumbs.db
