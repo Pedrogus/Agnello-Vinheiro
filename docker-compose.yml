@@ -22,6 +22,129 @@ services:
     # acessivel DENTRO da rede Docker. Publicar a porta 53 no PC costuma
     # conflitar com servicos do Windows e expoe o DNS sem necessidade.
  
+  # -------------------------------------------------------------------
+  # AUTH (login e validacao de JWT) - IP fixo 172.28.0.10
+  # -------------------------------------------------------------------
+  auth:
+    # Constroi a imagem a partir de auth/auth-service
+    # (Dockerfile + .dockerignore + src)
+    build:
+      context: ./auth/auth-service
+    container_name: agnello-auth
+ 
+    # O DNS precisa estar de pe antes do auth
+    depends_on:
+      - dns
+ 
+    # Entra na mesma rede, com o IP fixo do contrato
+    networks:
+      agnello-net:
+        ipv4_address: 172.28.0.10
+ 
+    # Este container usa o NOSSO DNS (agnello-dns) para resolver nomes
+    # como pedidos.agnello.local e estoque.agnello.local
+    dns:
+      - 172.28.0.2
+ 
+    # Publica a porta SOMENTE para a sua maquina (127.0.0.1), para os
+    # testes no Postman. Sem o "127.0.0.1" o servico ficaria visivel
+    # para toda a sua rede local.
+    ports:
+      - "127.0.0.1:8081:8081"
+ 
+    # Variaveis: o compose le o arquivo .env da raiz e repassa SO o que
+    # o auth precisa (principio do menor privilegio).
+    # ${NOME:?msg} faz o compose RECUSAR subir se a variavel estiver
+    # vazia ou ausente. ${NOME:-15} usa 15 se a variavel nao existir.
+    environment:
+      PORT: "8081"
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no arquivo .env}
+      JWT_EXPIRACAO_MINUTOS: ${JWT_EXPIRACAO_MINUTOS:-15}
+      CLIENTE_USUARIO: ${CLIENTE_USUARIO:?defina CLIENTE_USUARIO no arquivo .env}
+      CLIENTE_SENHA: ${CLIENTE_SENHA:?defina CLIENTE_SENHA no arquivo .env}
+      ATENDENTE_USUARIO: ${ATENDENTE_USUARIO:?defina ATENDENTE_USUARIO no arquivo .env}
+      ATENDENTE_SENHA: ${ATENDENTE_SENHA:?defina ATENDENTE_SENHA no arquivo .env}
+ 
+    # ---- Endurecimento (DevSecOps) ----
+    # Se o container der erro ao subir, comente as 4 linhas abaixo
+    # (cap_drop, security_opt, read_only e tmpfs), teste de novo e
+    # me avise: assim se descobre qual delas causou o problema.
+    #
+    # cap_drop ALL: remove todas as permissoes especiais do Linux.
+    cap_drop:
+      - ALL
+    # no-new-privileges: o processo nao consegue ganhar mais poder.
+    security_opt:
+      - no-new-privileges:true
+    # read_only: o sistema de arquivos fica so para leitura
+    # (o auth nao grava nada em disco).
+    read_only: true
+    # tmpfs: pasta temporaria em memoria, caso algo precise escrever.
+    tmpfs:
+      - /tmp
+ 
+    restart: unless-stopped
+
+
+# =====================================================================
+# ESTOQUE
+# =====================================================================
+
+auth:
+    # Constroi a imagem a partir de auth/auth-service
+    # (Dockerfile + .dockerignore + src)
+    build:
+      context: ./services/estoque-service
+    container_name: agnello-estoque
+ 
+    # O DNS e o AUTH precisa estar de pe antes do auth
+    depends_on:
+      - dns
+      - auth
+ 
+    # Entra na mesma rede, com o IP fixo do contrato
+    networks:
+      agnello-net:
+        ipv4_address: 172.28.0.12
+ 
+    # Este container usa o NOSSO DNS (agnello-dns) para resolver nomes
+    # como pedidos.agnello.local e estoque.agnello.local
+    dns:
+      - 172.28.0.2
+ 
+    # Publica a porta SOMENTE para a sua maquina (127.0.0.1), para os
+    # testes no Postman. Sem o "127.0.0.1" o servico ficaria visivel
+    # para toda a sua rede local.
+    ports:
+      - "127.0.0.1:8083:8083"
+ 
+    # Variaveis: o compose le o arquivo .env da raiz e repassa SO o que
+    # o auth precisa (principio do menor privilegio).
+    # ${NOME:?msg} faz o compose RECUSAR subir se a variavel estiver
+    # vazia ou ausente. ${NOME:-15} usa 15 se a variavel nao existir.
+    environment:
+      PORT: "8083"
+      AUTH_URL: "http://auth.agnello.local:8081"
+ 
+    # ---- Endurecimento (DevSecOps) ----
+    # Se o container der erro ao subir, comente as 4 linhas abaixo
+    # (cap_drop, security_opt, read_only e tmpfs), teste de novo e
+    # me avise: assim se descobre qual delas causou o problema.
+    #
+    # cap_drop ALL: remove todas as permissoes especiais do Linux.
+    cap_drop:
+      - ALL
+    # no-new-privileges: o processo nao consegue ganhar mais poder.
+    security_opt:
+      - no-new-privileges:true
+    # read_only: o sistema de arquivos fica so para leitura
+    # (o auth nao grava nada em disco).
+    read_only: true
+    # tmpfs: pasta temporaria em memoria, caso algo precise escrever.
+    tmpfs:
+      - /tmp
+ 
+    restart: unless-stopped
  
 # =====================================================================
 # REDE

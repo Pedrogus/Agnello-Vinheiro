@@ -1,0 +1,6 @@
+# O que NAO pode entrar na imagem do estoque-service
+node_modules
+.env
+.env.*
+.git
+npm-debug.log
