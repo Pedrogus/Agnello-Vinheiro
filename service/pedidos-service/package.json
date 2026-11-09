@@ -1,0 +1,17 @@
+{
+  "name": "pedidos-service",
+  "version": "1.0.0",
+  "description": "Servico de pedidos",
+  "private": true,
+  "type": "commonjs",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

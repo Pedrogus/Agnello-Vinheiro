@@ -89,18 +89,21 @@ services:
 # =====================================================================
 # ESTOQUE
 # =====================================================================
-
-auth:
-    # Constroi a imagem a partir de auth/auth-service
+  estoque:
+    # Constroi a imagem a partir de service/estoque-service
     # (Dockerfile + .dockerignore + src)
     build:
-      context: ./services/estoque-service
+      context: ./service/estoque-service
     container_name: agnello-estoque
  
-    # O DNS e o AUTH precisa estar de pe antes do auth
+    # O estoque so sobe depois que o DNS iniciou e o AUTH ficou SAUDAVEL
+    # (healthcheck do auth). Sem isso, as primeiras chamadas poderiam
+    # dar 503 por o auth ainda estar acordando.
     depends_on:
-      - dns
-      - auth
+      dns:
+        condition: service_started
+      auth:
+        condition: service_healthy
  
     # Entra na mesma rede, com o IP fixo do contrato
     networks:
@@ -108,7 +111,7 @@ auth:
         ipv4_address: 172.28.0.12
  
     # Este container usa o NOSSO DNS (agnello-dns) para resolver nomes
-    # como pedidos.agnello.local e estoque.agnello.local
+    # como auth.agnello.local
     dns:
       - 172.28.0.2
  
@@ -118,10 +121,9 @@ auth:
     ports:
       - "127.0.0.1:8083:8083"
  
-    # Variaveis: o compose le o arquivo .env da raiz e repassa SO o que
-    # o auth precisa (principio do menor privilegio).
-    # ${NOME:?msg} faz o compose RECUSAR subir se a variavel estiver
-    # vazia ou ausente. ${NOME:-15} usa 15 se a variavel nao existir.
+    # O estoque NAO recebe nenhum segredo: ele nao assina token, so
+    # pergunta ao auth quem esta chamando. Por isso nao ha ${...} aqui.
+    # AUTH_URL usa o nome do DNS e a porta INTERNA do auth (8081).
     environment:
       PORT: "8083"
       AUTH_URL: "http://auth.agnello.local:8081"
@@ -138,14 +140,86 @@ auth:
     security_opt:
       - no-new-privileges:true
     # read_only: o sistema de arquivos fica so para leitura
-    # (o auth nao grava nada em disco).
+    # (o estoque guarda tudo em memoria, nao grava em disco).
     read_only: true
     # tmpfs: pasta temporaria em memoria, caso algo precise escrever.
     tmpfs:
       - /tmp
  
     restart: unless-stopped
+
+# =====================================================================
+# PEDIDOS
+# =====================================================================
+  pedidos:
+    # Constroi a imagem a partir de service/pedidos-service
+    # (Dockerfile + .dockerignore + src)
+    build:
+      context: ./service/pedidos-service
+    container_name: agnello-pedidos
  
+    # O pedidos depende de TRES coisas:
+    #  - dns: so precisa ter iniciado (resolve os nomes);
+    #  - auth: precisa estar SAUDAVEL (valida cada token);
+    #  - estoque: precisa estar SAUDAVEL (o pedido reserva itens la).
+    # Sem isso, as primeiras chamadas poderiam dar 503 por dependencia
+    # ainda "acordando".
+    depends_on:
+      dns:
+        condition: service_started
+      auth:
+        condition: service_healthy
+      estoque:
+        condition: service_healthy
+ 
+    # Entra na mesma rede, com o IP fixo do contrato (igual ao dnsmasq.conf)
+    networks:
+      agnello-net:
+        ipv4_address: 172.28.0.11
+ 
+    # Este container usa o NOSSO DNS (agnello-dns) para resolver nomes
+    # como auth.agnello.local e estoque.agnello.local
+    dns:
+      - 172.28.0.2
+ 
+    # Publica a porta SOMENTE para a sua maquina (127.0.0.1), para os
+    # testes no Postman. Sem o "127.0.0.1" o servico ficaria visivel
+    # para toda a sua rede local.
+    ports:
+      - "127.0.0.1:8082:8082"
+ 
+    # O pedidos NAO recebe nenhum segredo: ele nao assina token, so
+    # pergunta ao auth quem esta chamando e repassa o token do usuario
+    # ao estoque. Por isso nao ha ${...} aqui.
+    # As URLs usam o nome do DNS e a porta INTERNA de cada servico
+    # (auth 8081, estoque 8083).
+    environment:
+      PORT: "8082"
+      AUTH_URL: "http://auth.agnello.local:8081"
+      ESTOQUE_URL: "http://estoque.agnello.local:8083"
+ 
+    # ---- Endurecimento (DevSecOps) ----
+    # Se o container der erro ao subir, comente as 4 linhas abaixo
+    # (cap_drop, security_opt, read_only e tmpfs), teste de novo e
+    # me avise: assim se descobre qual delas causou o problema.
+    #
+    # cap_drop ALL: remove todas as permissoes especiais do Linux.
+    cap_drop:
+      - ALL
+    # no-new-privileges: o processo nao consegue ganhar mais poder.
+    security_opt:
+      - no-new-privileges:true
+    # read_only: o sistema de arquivos fica so para leitura
+    # (o pedidos guarda tudo em memoria, nao grava em disco).
+    read_only: true
+    # tmpfs: pasta temporaria em memoria, caso algo precise escrever.
+    tmpfs:
+      - /tmp
+ 
+    restart: unless-stopped
+
+
+
 # =====================================================================
 # REDE
 # =====================================================================

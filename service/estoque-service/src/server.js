@@ -1,4 +1,4 @@
-'user strict'
+'use strict'
 
 const crypto = require('node:crypto');
 const express = require('express');
@@ -143,7 +143,7 @@ app.use((req, res, next) => {
 
 // GET /health - sem filtros (Docker e Jenkins precisam chamar sem token)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', servico: 'estoque-service' });
+  res.json({ status: 'ok', service: 'estoque-service' });
 });
  
 // GET /estoque/:vinhoId - so atendente

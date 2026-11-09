@@ -49,7 +49,7 @@ function lerConfiguracao() {
             falhar('JWT_EXPIRACAO_MINUTOS deve ser um inteiro entre 1 e 1440');
         }
 
-        const porta = Number(process.env.PORT || 3000);
+        const porta = Number(process.env.PORT || 8081);
         if(!Number.isInteger(porta) || porta < 1 || porta > 65535) {
             falhar('PORT invalida.');
         }
