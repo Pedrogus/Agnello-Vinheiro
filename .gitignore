@@ -4,7 +4,8 @@ node_modules
 *.pem
 *.crt
 /out/
-/deploy/releases/
+deploy/*
+!deploy/.gitkeep
 .env*
 !.env.example
 .DS_Store
