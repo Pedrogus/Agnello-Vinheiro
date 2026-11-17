@@ -278,6 +278,76 @@ services:
     restart: unless-stopped
 
 
+  # -------------------------------------------------------------------
+  # PROXY (nginx com TLS/HTTPS) - IP fixo 172.28.0.30
+  # -------------------------------------------------------------------
+  proxy:
+    # Imagem oficial do nginx, versao FIXA (variante Alpine). Nao ha build:
+    # a configuracao e o certificado entram por volume.
+    image: nginx:1.27.5-alpine
+    container_name: agnello-proxy
+
+    # O proxy so sobe com DNS no ar e os tres servicos SAUDAVEIS.
+    depends_on:
+      dns:
+        condition: service_started
+      auth:
+        condition: service_healthy
+      pedidos:
+        condition: service_healthy
+      estoque:
+        condition: service_healthy
+
+    # Entra na mesma rede, com o IP fixo do contrato (igual ao dnsmasq.conf)
+    networks:
+      agnello-net:
+        ipv4_address: 172.28.0.30
+
+    # Usa o NOSSO DNS para achar auth, pedidos e estoque.
+    dns:
+      - 172.28.0.2
+
+    # Publica SOMENTE para a sua maquina (127.0.0.1):
+    #   https://localhost:8443  -> porta 443 do container (TLS)
+    #   http://localhost:8088   -> porta 80 (so redireciona para HTTPS)
+    ports:
+      - "127.0.0.1:8443:443"
+      - "127.0.0.1:8088:80"
+
+    volumes:
+      # Configuracao e certificado em SOMENTE LEITURA (:ro).
+      - ./infra/proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/tls:/etc/nginx/tls:ro
+
+    # Saude: rota /proxy-health na porta 80 (HTTP, sem certificado).
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/proxy-health"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+    # ---- Endurecimento (DevSecOps) ----
+    # Remove TODAS as permissoes e devolve so as 4 que o nginx precisa:
+    # abrir porta baixa, trocar de usuario e ajustar dono de pastas.
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETUID
+      - SETGID
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    # Sistema de arquivos somente leitura; so estas pastas em memoria:
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+
+    restart: unless-stopped
+
+
 # =====================================================================
 # REDE
 # =====================================================================
