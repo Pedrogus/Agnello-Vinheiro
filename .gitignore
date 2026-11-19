@@ -3,6 +3,7 @@ node_modules
 *.key
 *.pem
 *.crt
+*.pcap
 /out/
 deploy/*
 !deploy/.gitkeep
